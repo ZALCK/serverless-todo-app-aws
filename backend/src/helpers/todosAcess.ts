@@ -3,20 +3,12 @@ import * as AWS from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 //import { createLogger } from '../utils/logger'
 import { TodoItem } from '../models/TodoItem'
-//import { TodoUpdate } from '../models/TodoUpdate';
+import { TodoUpdate } from '../models/TodoUpdate';
 
 //const XAWS = AWSXRay.captureAWS(AWS)
-
 //const logger = createLogger('TodosAccess')
 
 // TODO: Implement the dataLayer logic
-//const docClient: DocumentClient = new AWS.DynamoDB.DocumentClient()
-
-//const todosTable = process.env.TODOS_TABLE
-//const userIdIndex = process.env.USER_ID_INDEX
-
-
-
 export class TodosAccess {
     constructor(
         private readonly docClient: DocumentClient = new AWS.DynamoDB.DocumentClient(),
@@ -25,15 +17,43 @@ export class TodosAccess {
 
     async createTodo(todoItem: TodoItem): Promise<TodoItem> {
         console.log("Creating new todo");
+        
         const params = {
             TableName: this.todosTable,
             Item: todoItem,
         };
     
-        const result = await this.docClient.put(params).promise();
-        console.log(result);
+        await this.docClient.put(params).promise();
     
         return todoItem as TodoItem;
+    }
+
+    async updateTodo(todoUpdate: TodoUpdate, todoId: string, userId: string): Promise<TodoUpdate> {
+        console.log("Updating a todo");
+        
+        const params = {
+            TableName: this.todosTable,
+            Key: {
+                "userId": userId,
+                "todoId": todoId
+            },
+            UpdateExpression: "set #nameField = :nameField, #dueDateField = :dueDateField, #doneField = :doneField",
+            ExpressionAttributeNames: {
+                "#nameField": "name",
+                "#dueDateField": "dueDate",
+                "#doneField": "done"
+            },
+            ExpressionAttributeValues: {
+                ":nameField": todoUpdate.name,
+                ":dueDateField": todoUpdate.dueDate,
+                ":doneField": todoUpdate.done
+            },
+            ReturnValues: "ALL_NEW"
+        };
+    
+        const result = await this.docClient.update(params).promise();
+    
+        return result.Attributes as TodoUpdate;
     }
     
     async getTodosByUserId(userId: string): Promise<TodoItem[]> {
@@ -51,10 +71,23 @@ export class TodosAccess {
         };
     
         const result = await this.docClient.query(params).promise();
-        console.log(result);
-        const items = result.Items;
     
-        return items as TodoItem[];
+        return result.Items as TodoItem[];
     }
 
+    async deleteTodo(todoId: string, userId:string): Promise<string> {
+        console.log("Deleting todo");
+
+        const params = {
+            TableName: this.todosTable,
+            Key: {
+                "userId": userId,
+                "todoId": todoId
+            },
+        };
+
+        await this.docClient.delete(params).promise();
+
+        return "" as string;
+    }
 }
